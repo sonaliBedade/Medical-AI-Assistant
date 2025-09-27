@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Medical Chatbot</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+
+  <!-- Google Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+
+  <!-- Bootstrap (unchanged major) -->
+  <link rel="stylesheet"
+        href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css"
+        integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO"
+        crossorigin="anonymous">
+
+  <!-- Icons -->
+  <link rel="stylesheet"
+        href="https://use.fontawesome.com/releases/v5.5.0/css/all.css"
+        integrity="sha384-B4dIYHKNBt8Bc12p+WXckhzcICo0wtJAoU8YZTY5qE0Id1GSseTk6S+L3BlXeVIU"
+        crossorigin="anonymous">
+
+  <!-- Your CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"/>
+</head>
+
+<body>
+  <div class="page">
+    <div class="chat-card shadow-lg">
+      <!-- Header -->
+      <div class="chat-header">
+        <div class="avatar">
+          <img src="https://cdn-icons-png.flaticon.com/512/387/387569.png" alt="bot"/>
+          <span class="status-dot"></span>
+        </div>
+        <div>
+          <div class="title">Dr.Rag</div>
+          <div class="subtitle">Hey, how are you feeling today?</div>
+        </div>
+        <button class="btn btn-sm btn-outline-light ml-auto" id="clearBtn" title="Clear chat">
+          <i class="fas fa-broom"></i>
+        </button>
+      </div>
+
+      <!-- Body -->
+      <div id="chatBody" class="chat-body"></div>
+
+      <!-- Typing indicator -->
+      <div id="typing" class="typing hidden">
+        <span></span><span></span><span></span>
+      </div>
+
+      <!-- Footer -->
+      <div class="chat-footer">
+        <form id="messageForm" class="w-100 d-flex">
+          <textarea id="text" name="msg" class="input" rows="1"
+            placeholder="Type your message... (Enter to send, Shift+Enter for new line)" required></textarea>
+          <button type="submit" id="send" class="send-btn">
+            <i class="fas fa-paper-plane"></i>
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- JS (jQuery + Bootstrap) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/js/bootstrap.min.js"
+          integrity="sha384-ChfqqxuZUCnJSK3+MXmPNIyE6ZbWh2IMqE241rYiqJxyMiZ6OW/JmZQ5stwEULTy"
+          crossorigin="anonymous"></script>
+
+  <script>
+    const chatBody  = document.getElementById('chatBody');
+    const form      = document.getElementById('messageForm');
+    const input     = document.getElementById('text');
+    const sendBtn   = document.getElementById('send');
+    const typing    = document.getElementById('typing');
+    const clearBtn  = document.getElementById('clearBtn');
+
+    function scrollToBottom() {
+      chatBody.scrollTop = chatBody.scrollHeight;
+    }
+
+    function timeNow() {
+      const d = new Date();
+      return d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+    }
+
+    function bubble(html, who='bot') {
+      const wrap = document.createElement('div');
+      wrap.className = `msg ${who}`;
+      wrap.innerHTML = `
+        ${who === 'bot'
+          ? `<div class="msg-avatar"><img src="https://cdn-icons-png.flaticon.com/512/387/387569.png"/></div>`
+          : ``}
+        <div class="msg-bubble">
+          <div class="msg-text">${html}</div>
+          <div class="msg-time">${timeNow()}</div>
+        </div>
+      `;
+      chatBody.appendChild(wrap);
+      scrollToBottom();
+    }
+
+    // Enter to send, Shift+Enter = newline
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        form.dispatchEvent(new Event('submit'));
+      }
+    });
+
+    clearBtn.addEventListener('click', () => {
+      chatBody.innerHTML = '';
+      input.value = '';
+      input.focus();
+    });
+
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      const rawText = input.value.trim();
+      if (!rawText) return;
+
+      // User bubble
+      bubble($('<div>').text(rawText).html(), 'user');
+
+      // Reset
+      input.value = '';
+      input.style.height = '48px';
+
+      // show typing
+      typing.classList.remove('hidden');
+      sendBtn.disabled = true;
+
+      // AJAX to Flask
+      $.ajax({
+        type: 'POST',
+        url: '/get',
+        data: { msg: rawText }
+      }).done(function (data) {
+        typing.classList.add('hidden');
+        sendBtn.disabled = false;
+        // Bot bubble (allow basic HTML returned by your server)
+        bubble(data, 'bot');
+      }).fail(function () {
+        typing.classList.add('hidden');
+        sendBtn.disabled = false;
+        bubble("Sorry, I couldn't reach the server. Please try again.", 'bot');
+      });
+    });
+
+    // Auto-resize textarea
+    input.addEventListener('input', () => {
+      input.style.height = '48px';
+      input.style.height = Math.min(input.scrollHeight, 140) + 'px';
+    });
+  </script>
+</body>
+</html>

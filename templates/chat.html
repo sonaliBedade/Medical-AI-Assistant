@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="utf-8" />
   <title>Medical AI Assistant</title>
@@ -20,7 +20,7 @@
         integrity="sha384-B4dIYHKNBt8Bc12p+WXckhzcICo0wtJAoU8YZTY5qE0Id1GSseTk6S+L3BlXeVIU"
         crossorigin="anonymous">
 
-  <!-- Your CSS -->
+  <!-- Your CSS (use the updated calm version I sent) -->
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"/>
 </head>
 
@@ -30,32 +30,52 @@
       <!-- Header -->
       <div class="chat-header">
         <div class="avatar">
-          <img src="https://cdn-icons-png.flaticon.com/512/387/387569.png" alt="bot"/>
-          <span class="status-dot"></span>
+          <img src="https://cdn-icons-png.flaticon.com/512/387/387569.png" alt="Bot avatar"/>
+          <span class="status-dot" aria-hidden="true"></span>
         </div>
-        <div>
+
+        <div class="hdr-text">
           <div class="title">Dr.Rag</div>
-          <div class="subtitle">Hey, how are you feeling today?</div>
+          <div class="subtitle">A calm space to check in with yourself</div>
         </div>
-        <button class="btn btn-sm btn-outline-light ml-auto" id="clearBtn" title="Clear chat">
-          <i class="fas fa-broom"></i>
-        </button>
+
+        <div class="hdr-actions ml-auto">
+          <button class="btn-icon" id="themeToggle" aria-label="Toggle theme" title="Toggle theme">
+            <i class="far fa-moon"></i>
+          </button>
+          <button class="btn-icon" id="clearBtn" title="Clear chat" aria-label="Clear chat">
+            <i class="fas fa-broom"></i>
+          </button>
+        </div>
       </div>
 
       <!-- Body -->
-      <div id="chatBody" class="chat-body"></div>
+      <div id="chatBody" class="chat-body" role="log" aria-live="polite">
+        <!-- Empty state -->
+        <div class="empty-state" id="emptyState">
+          <div class="empty-emoji">🩺</div>
+          <div class="empty-title">Hey, how are you feeling today?</div>
+          <div class="empty-hint">You can ask about symptoms, medications, or just talk.</div>
+          <div class="empty-suggestions">
+            <button class="chip" type="button">Track my headache today</button>
+            <button class="chip" type="button">What are common side-effects of ibuprofen?</button>
+            <button class="chip" type="button">Help me breathe and relax</button>
+          </div>
+        </div>
+      </div>
 
       <!-- Typing indicator -->
-      <div id="typing" class="typing hidden">
+      <div id="typing" class="typing hidden" aria-hidden="true">
         <span></span><span></span><span></span>
       </div>
 
       <!-- Footer -->
       <div class="chat-footer">
-        <form id="messageForm" class="w-100 d-flex">
+        <form id="messageForm" class="w-100 d-flex" autocomplete="off">
           <textarea id="text" name="msg" class="input" rows="1"
-            placeholder="Type your message... (Enter to send, Shift+Enter for new line)" required></textarea>
-          <button type="submit" id="send" class="send-btn">
+            placeholder="Type your message... (Enter to send, Shift+Enter for new line)" required
+            aria-label="Message input"></textarea>
+          <button type="submit" id="send" class="send-btn" aria-label="Send message" title="Send">
             <i class="fas fa-paper-plane"></i>
           </button>
         </form>
@@ -69,14 +89,19 @@
           integrity="sha384-ChfqqxuZUCnJSK3+MXmPNIyE6ZbWh2IMqE241rYiqJxyMiZ6OW/JmZQ5stwEULTy"
           crossorigin="anonymous"></script>
 
+  <!-- App JS -->
   <script>
+    // Elements
     const chatBody  = document.getElementById('chatBody');
     const form      = document.getElementById('messageForm');
     const input     = document.getElementById('text');
     const sendBtn   = document.getElementById('send');
     const typing    = document.getElementById('typing');
     const clearBtn  = document.getElementById('clearBtn');
+    const themeToggle = document.getElementById('themeToggle');
+    const emptyState  = document.getElementById('emptyState');
 
+    // Utils
     function scrollToBottom() {
       chatBody.scrollTop = chatBody.scrollHeight;
     }
@@ -86,16 +111,25 @@
       return d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
     }
 
+    function escapeHtml(str){
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
     function bubble(html, who='bot') {
+      // hide empty state on first real message
+      emptyState?.classList.add('hidden');
+
       const wrap = document.createElement('div');
       wrap.className = `msg ${who}`;
       wrap.innerHTML = `
         ${who === 'bot'
-          ? `<div class="msg-avatar"><img src="https://cdn-icons-png.flaticon.com/512/387/387569.png"/></div>`
+          ? `<div class="msg-avatar"><img src="https://cdn-icons-png.flaticon.com/512/387/387569.png" alt="Bot"/></div>`
           : ``}
         <div class="msg-bubble">
           <div class="msg-text">${html}</div>
-          <div class="msg-time">${timeNow()}</div>
+          <div class="msg-time" aria-hidden="true">${timeNow()}</div>
         </div>
       `;
       chatBody.appendChild(wrap);
@@ -111,18 +145,31 @@
     });
 
     clearBtn.addEventListener('click', () => {
-      chatBody.innerHTML = '';
-      input.value = '';
-      input.focus();
+    // Remove only messages, not the empty state container
+    chatBody.querySelectorAll('.msg').forEach(m => m.remove());
+    // Re-show the empty state
+    emptyState?.classList.remove('hidden');
+    // Reset input
+    input.value = '';
+    input.focus();
     });
 
+    // Chips (suggested prompts)
+    document.addEventListener('click', (e) => {
+      const chip = e.target.closest('.chip');
+      if (!chip) return;
+      input.value = chip.textContent.trim();
+      form.dispatchEvent(new Event('submit'));
+    });
+
+    // Form submit -> AJAX to Flask
     form.addEventListener('submit', function (e) {
       e.preventDefault();
       const rawText = input.value.trim();
       if (!rawText) return;
 
       // User bubble
-      bubble($('<div>').text(rawText).html(), 'user');
+      bubble(escapeHtml(rawText), 'user');
 
       // Reset
       input.value = '';
@@ -154,6 +201,25 @@
       input.style.height = '48px';
       input.style.height = Math.min(input.scrollHeight, 140) + 'px';
     });
+
+    // Theme preference
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const savedTheme = localStorage.getItem('theme') || (prefersDark ? 'dark' : 'light');
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    updateThemeIcon(savedTheme);
+
+    themeToggle.addEventListener('click', () => {
+      const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      localStorage.setItem('theme', next);
+      updateThemeIcon(next);
+    });
+
+    function updateThemeIcon(theme) {
+      themeToggle.innerHTML = theme === 'dark'
+        ? '<i class="far fa-sun"></i>'
+        : '<i class="far fa-moon"></i>';
+    }
   </script>
 </body>
 </html>

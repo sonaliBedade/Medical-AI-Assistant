@@ -1,0 +1,26 @@
+# Core Langchain
+langchain
+langchain-community
+
+# Input
+pypdf
+
+# Embeddings
+sentence-transformers
+
+# Env vars/api keys
+python-dotenv
+
+# Vector DB
+langchain-pinecone
+
+# LLM 
+langchain-groq
+
+# Interface
+flask
+
+# Eval
+Ragas
+
+-e .

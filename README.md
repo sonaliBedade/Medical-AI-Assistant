@@ -1,3 +1,3 @@
 # Medical-AI-Assistant
 
-View http://3.101.191.159:8080/
+View https://huggingface.co/spaces/bSonali/healthcare-ai-assistant
